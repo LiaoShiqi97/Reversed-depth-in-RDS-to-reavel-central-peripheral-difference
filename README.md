@@ -6,3 +6,4 @@ Note:
 1) you can follow the "How to run the code.txt" file to run the code and see how the experiment goes on
 2) the implementation of the "dynamics" is wrong. I implement it as a random generated disparity. However, it should be implemented as a gradually increasing disparity with a certain step. And it should be implemented differently when the step order is odd and even as stated in the paper. You can modify it and see how the real expereiment works.
 3) It should work like this:
+<img src="https://github.com/LiaoShiqi97/Reversed-depth-in-RDS-to-reavel-central-peripheral-difference/blob/main/screenshot.png">
