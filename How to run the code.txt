@@ -1,0 +1,7 @@
+The experiment code only contains one file (maincode_Liao.m). You can run it directly as all parameters are set default accroding to the paper. 
+
+The recording data conntains one file(liao-r1-07-Apr-2024-18-24.mat) 
+
+The data analysis contains one file (data_analysis.mlx) and three pictures.
+
+If you meet any problems or bugs when running my code, please contact me via shiqiliao0318@gmail.com

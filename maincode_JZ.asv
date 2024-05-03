@@ -1,0 +1,322 @@
+% This is an simplified implementation for experiment 1 of paper Reversed depth in anti-correlated random dot stereograms and the central-peripheral
+% difference in visual inference.
+% This is based on jinyouZou's example coding.
+
+%% some useful pre-setup
+
+% clear all exist variables and close all graphic buffer
+clear all; sca;
+
+% Unify key code for different operating system
+KbName('UnifyKeyNames');
+
+% Useful when you program on your laptop
+Screen('Preference', 'SkipSyncTests', 1);
+
+% Shuffle seeds for random number generator, otherwise the random number
+% sequence would be the same every time when you restart MATLAB.
+rng('shuffle');
+
+% Move cursor to command window in case you modify your script while running
+commandwindow;
+
+% RestrictKeysForKbCheck(KbName('s'));
+%% parameter
+
+% input some information and use them as the name of the log file
+subjectName = input('## Please input subject name: ', 's');
+sessionNumber = input('## Please input session number: ');
+
+% initialize as empty
+params = []; 
+% specify which monitor to use
+params.screen.SCREEN_NUM = 2;  
+% stereomode 6 means red-green anaglyph
+params.screen.STEREO_MODE = 6;
+% background color grey
+params.screen.BACK_COLOR = 128;
+% foreground color
+params.screen.FOR_COLOR = 200;
+% red cross line width
+params.screen.lineWidthPix = 4;
+% color red
+params.screen.RED_COLOR = [255,0,0];
+% color green
+params.screen.GREEN_COLOR = [0,255,0];
+% button to report disk is in fornt of the surrounding ring
+params.screen.FRONT_REPORT = KbName('y');
+% button to report disk is behind the surrounding ring
+params.screen.BEHIND_REPORT = KbName('n');
+
+%---------------Stimulus and screen size ----------------------------------
+% These parameter would determine the stimulus size, please varify them.
+params.screen.displayPhysicalWidthMM = Screen('DisplaySize', params.screen.SCREEN_NUM);  %mm
+params.screen.viewingDistanceMM = 200;  %mm
+% The specific parameters for the experiment1, merge central and peripheral
+% parameters into one.
+
+params.stim.sDeg = 0.348; % size of Dot in Deg
+params.stim.rDeg = 3; % radius of Central Disk in Deg
+params.stim.RDeg = 4.3; % radius of Surrounding Ring in Deg
+params.stim.dAbsoluteDeg = 0.087; % absolute of disparity step in Deg
+params.stim.e0Deg = 3.65; % distance from red cross to Central Disk Center At Central View in Deg
+params.stim.sfDeg = 0.44; % size of Red Cross in Deg
+params.stim.e1Deg = 10.1; % distance from red cross to Central Disk Center At Peripheral View in Deg
+params.stim.greenCircle = 0; % whether to plot green circle
+params.stim.dotRatio = 0.25; % 25% of the disk area would be covered by the dots if they did not occlude each other
+params.stim.binocularRectangularWidthDeg = 1; % binocular rectangular frame width
+params.stim.colorBinocularRectangular = [0,0,0]; % color of binocular rectangular frame
+params.stim.fixationPeriodTimeMS = 0.7; % fixation period time 0.7 ms
+
+%---------------Stimulus conditons -----------------------------------------------------------
+% --- Conditions included in this session, each row indicate a condition
+params.stim.NTrialsPerCondition = 3; % Number of trials per condition
+params.stim.NfixationPosition = 2; % Number of fixation position 1 = Red Cross At Central View, 2 = Red Cross At Peripheral View
+params.stim.NTypesRDSCorrelation = 3; % Number of types of RDS Correlation 1 = Correlated, 2 = Half-matched, 3 = Anticorrelated
+NConditions = params.stim.NfixationPosition * params.stim.NTypesRDSCorrelation; % Total number of conditions
+
+%% open screen and draw buffers
+% Open double-buffered onscreen window with the requested stereo mode,
+[windowPtr, windowRect] = PsychImaging('OpenWindow', params.screen.SCREEN_NUM, ...
+    params.screen.BACK_COLOR, [], [], [], params.screen.STEREO_MODE);
+
+
+% return the center point coordinate of the screen
+[Screen_center(1),Screen_center(2)]  = RectCenter(windowRect);
+
+%------------------ calculate the pixel size ----------------------
+PixelPerDegreeVA = windowRect(3) / (2 * atand(params.screen.displayPhysicalWidthMM / 2 / params.screen.viewingDistanceMM));
+
+s_Pix = round(params.stim.sDeg * PixelPerDegreeVA);
+r_Pix = round(params.stim.sDeg * PixelPerDegreeVA);
+R_Pix = round(params.stim.RDeg * PixelPerDegreeVA);
+dAbsolute_Pix = round(params.stim.dAbsoluteDeg * PixelPerDegreeVA);
+e0_Pix = round(params.stim.e0Deg * PixelPerDegreeVA);
+sf_Pix = round(params.stim.sfDeg * PixelPerDegreeVA);
+e1_Pix = round(params.stim.e1Deg * PixelPerDegreeVA);
+binocularRectangularFrameWidth_Pix = round(params.stim.binocularRectangularWidthDeg * PixelPerDegreeVA);
+
+% compute relative rectangular coordinates for Red Cross
+crossXCoords = [-sf_Pix/2 sf_Pix/2 0 0];
+crossYCoords = [0 0 -sf_Pix/2 sf_Pix/2];
+crossAllCoords = [crossXCoords; crossYCoords];
+
+% compute the space within the balck rectangluar frame
+windowRect_dot = [windowRect(1)+binocularRectangularFrameWidth_Pix, ...
+    windowRect(2)+binocularRectangularFrameWidth_Pix, ...
+    windowRect(3)-binocularRectangularFrameWidth_Pix, ...
+    windowRect(4)-binocularRectangularFrameWidth_Pix,];
+
+% --------------------------------------------------------
+% Buffer: Waiting page
+% --------------------------------------------------------
+WaitInstructionPage = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+% Display some texts on screen
+Screen('DrawText',WaitInstructionPage, 'Wait ...', Screen_center(1)-50,Screen_center(2), params.screen.FOR_COLOR);
+Screen('FrameRect', WaitInstructionPage, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+
+
+% --------------------------------------------------------
+% Buffer: Prefixation page
+% --------------------------------------------------------
+
+
+% --------------------------------------------------------
+% Buffer: FixationBack Page
+% --------------------------------------------------------
+% create Page
+FixationBackPageLeft = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+FixationBackPageRight = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+Screen('BlendFunction', FixationBackPageLeft, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+Screen('BlendFunction', FixationBackPageRight, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+% Screen('DrawLines', FixationBackPageLeft, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e0_Pix], 2);
+Screen('FrameRect', FixationBackPageLeft, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+
+% Screen('DrawLines', FixationBackPageRight , crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e0_Pix], 2);
+Screen('FrameRect', FixationBackPageRight , params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+
+
+
+% --------------------------------------------------------
+% Buffer: Fixation Page
+% --------------------------------------------------------
+% compute rectangular coordinates and color for Ndots
+areaScreen_Pix2 =  windowRect_dot(3) * windowRect_dot(4);
+areaDot_Pix2 = s_Pix * s_Pix;
+Ndots = round(areaScreen_Pix2/areaDot_Pix2 * params.stim.dotRatio);
+rectDots = zeros(params.stim.NfixationPosition, params.stim.NTypesRDSCorrelation, params.stim.NTrialsPerCondition, 4, Ndots);
+colorDots = zeros(params.stim.NfixationPosition, params.stim.NTypesRDSCorrelation, params.stim.NTrialsPerCondition, 3, Ndots);
+for ifixationPosition = 1 : params.stim.NfixationPosition
+    for itypesRDSCorrelation = 1 : params.stim.NTypesRDSCorrelation
+        for itrial = 1 : params.stim.NTrialsPerCondition
+            xSelected = randi([windowRect_dot(1), windowRect_dot(3) - s_Pix], 1, Ndots);
+            ySelected = randi([windowRect_dot(2), windowRect_dot(4) - s_Pix], 1, Ndots);
+            rectDots(ifixationPosition, itypesRDSCorrelation, itrial, :, :) = vertcat(xSelected, ySelected, xSelected+s_Pix, ySelected+s_Pix);
+            colorSelected = repmat(((rand(Ndots, 1)>0.5) * 255)', 3, 1);
+            colorDots(ifixationPosition, itypesRDSCorrelation, itrial, :, :) = colorSelected;
+        end
+    end
+end
+
+
+% --------------------------------------------------------
+% Buffer3: Report Page
+% --------------------------------------------------------
+ReportPage = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+Screen('BlendFunction', ReportPage, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+Screen('DrawText', ReportPage,  'Please report your decision on the depth order of disk.',  Screen_center(1)-300, Screen_center(2), params.screen.FOR_COLOR);
+Screen('DrawText', ReportPage,  'If it is in front of the surrounding ring, please press y, otherwise press n.',  Screen_center(1)-300, Screen_center(2)+20, params.screen.FOR_COLOR);
+Screen('FrameRect', ReportPage, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+
+
+% --------------------------------------------------------
+% Buffer4: End page
+% --------------------------------------------------------
+ExperimentFinishPage = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+Screen('BlendFunction', ExperimentFinishPage, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+Screen('DrawText',ExperimentFinishPage,  'Trials completed --- Thank you very much!!',  Screen_center(1)-100,Screen_center(2), params.screen.FOR_COLOR);
+Screen('DrawText',ExperimentFinishPage,  'please tell the experimenter your comments/observations',  Screen_center(1)-100,Screen_center(2)+30, params.screen.FOR_COLOR);
+Screen('FrameRect', ExperimentFinishPage, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+
+%% trial loop
+%--------------------------------------------------------------------------
+% EXPERIMENT
+%--------------------------------------------------------------------------
+
+% get time information
+day = date; clocktime = clock;
+% define the log file name
+fn =[subjectName, '-r', num2str(sessionNumber), '-', day, '-', num2str(clocktime(4)), '-', num2str(clocktime(5)), '.mat'];
+
+% Wait Page
+Screen('SelectStereoDrawBuffer',windowPtr,0);
+Screen('DrawTexture', windowPtr, WaitInstructionPage)
+Screen('SelectStereoDrawBuffer',windowPtr,1);
+Screen('DrawTexture', windowPtr, WaitInstructionPage)
+Screen('Flip', windowPtr);
+pause(0.7);
+
+% -- loop over conditions and trials
+for ifixationPosition = 1 : params.stim.NfixationPosition
+    for itypesRDSCorrelation = 1 : params.stim.NTypesRDSCorrelation
+        for itrial = 1 : params.stim.NTrialsPerCondition
+            % Prefixation page
+            % create Page
+            PrefixationPage = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+            Screen('BlendFunction', PrefixationPage, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            Screen('FrameRect', PrefixationPage, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+            Screen('DrawLines', PrefixationPage, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e0_Pix], 2);
+            if ifixationPosition == 2
+                Screen('DrawLines', PrefixationPage, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e1_Pix], 2);
+                Screen('DrawText', PrefixationPage,  'Press any button',  Screen_center(1)-200, Screen_center(2)-e1_Pix, params.screen.FOR_COLOR);
+                Screen('DrawText', PrefixationPage,  'For the next trial',  Screen_center(1)+50, Screen_center(2)-e1_Pix, params.screen.FOR_COLOR);
+            else
+                Screen('DrawText', PrefixationPage,  'Press any button',  Screen_center(1)-200, Screen_center(2)-e0_Pix, params.screen.FOR_COLOR);
+                Screen('DrawText', PrefixationPage,  'For the next trial',  Screen_center(1)+50, Screen_center(2)-e0_Pix, params.screen.FOR_COLOR);
+            end
+            Screen('SelectStereoDrawBuffer',windowPtr,0);
+            Screen('DrawTexture', windowPtr, PrefixationPage)
+            Screen('SelectStereoDrawBuffer',windowPtr,1);
+            Screen('DrawTexture', windowPtr, PrefixationPage)
+            Screen('Flip', windowPtr);
+            pause(0.3);
+            KbWait;
+    
+            % fixation page
+            FixationPageLeft = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+            FixationPageRight = Screen('OpenOffscreenWindow', windowPtr, params.screen.BACK_COLOR);
+            Screen('BlendFunction', FixationPageLeft, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            Screen('BlendFunction', FixationPageRight, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            % prepare the stimulus
+            tic
+            if ifixationPosition ==2
+                Screen('DrawLines', FixationPageRight, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e1_Pix], 2);
+            end
+            Screen('DrawLines', FixationPageLeft, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e0_Pix], 2);
+            Screen('FrameRect', FixationPageLeft, params.stim.colorBinocularRectangular, windowRect, binocularRectangularFrameWidth_Pix);
+            
+            if params.stim.greenCircle == 1
+                Screen('FrameOval', FixationPageLeft, params.screen.GREEN_COLOR, [Screen_center(1)-r_Pix Screen_center(2)-r_Pix Screen_center(1)+r_Pix, Screen_center(2)+r_Pix]);
+                Screen('FrameOval', FixationPageRight, params.screen.GREEN_COLOR, [Screen_center(1)-r_Pix Screen_center(2)-r_Pix Screen_center(1)+r_Pix, Screen_center(2)+r_Pix]);
+            end
+
+            Screen('FillRect', FixationPageLeft, squeeze(colorDots(ifixationPosition, itypesRDSCorrelation, itrial,  :, :)), squeeze(rectDots(ifixationPosition, itypesRDSCorrelation, itrial,  :, :)));
+            Screen('FillRect', FixationPageRight, squeeze(colorDots(ifixationPosition, itypesRDSCorrelation, itrial,  :, :)), squeeze(rectDots(ifixationPosition, itypesRDSCorrelation, itrial,  :, :)));
+            % TODO: Add disparity to FixationPageRight, also considering why R and r
+            % are different
+            true = rand()>0.5; % the signal of the disparity 
+    
+    
+            % fixationback page
+            if ifixationPosition ==2
+                Screen('DrawLines', FixationBackPageLeft, crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e1_Pix], 2);
+                Screen('DrawLines', FixationBackPageRight , crossAllCoords, params.screen.lineWidthPix, params.screen.RED_COLOR, [Screen_center(1) Screen_center(2)-e1_Pix], 2);
+            end
+            
+            Screen('SelectStereoDrawBuffer',windowPtr,0);
+            Screen('DrawTexture', windowPtr, FixationBackPageLeft)
+            Screen('SelectStereoDrawBuffer',windowPtr,1);
+            Screen('DrawTexture', windowPtr, FixationBackPageRight)
+            Screen('Flip', windowPtr);
+    
+            % to let the time interval between prefixation period to fixation period is the same 1.0 sec
+            t = toc;
+            pause(1.0-t);
+    
+            % present the stimuli
+            Screen('SelectStereoDrawBuffer',windowPtr,0);
+            Screen('DrawTexture', windowPtr, FixationPageLeft)
+            Screen('SelectStereoDrawBuffer',windowPtr,1);
+            Screen('DrawTexture', windowPtr,FixationPageRight)
+            Screen('Flip', windowPtr);
+            pause(0.7);
+    
+            % Report Page
+            Screen('SelectStereoDrawBuffer',windowPtr,0);
+            Screen('DrawTexture', windowPtr, ReportPage)
+            Screen('SelectStereoDrawBuffer',windowPtr,1);
+            Screen('DrawTexture', windowPtr,ReportPage)
+            Screen('Flip', windowPtr);    
+            [keyPressTimeSec, keyCode] = KbWait;
+            report = keyCode(params.screen.FRONT_REPORT) == 1;
+            FlushEvents('keyDown');	% Discard all the chars from the Event Manager queue.
+    
+            % Clear buffers and textures which will not be used anymore to prevent
+            % overload of the graphic memory.
+            Screen('Close', FixationPageLeft);
+            Screen('Close', FixationPageRight);
+            Screen('Close', PrefixationPage);
+            
+    
+            % save the data..............
+            data{itrial,1} = ifixationPosition;
+            data{itrial,2} = itypesRDSCorrelation;   %--- response button pressed
+            data{itrial,3} = true;     %--- true in front of or behind
+            data{itrial,4} = report;     %--- response in front of or behind
+        end
+    end
+end
+
+%% Finish
+
+Screen('SelectStereoDrawBuffer',windowPtr,0);
+Screen('DrawTexture', windowPtr, ExperimentFinishPage);
+Screen('SelectStereoDrawBuffer',windowPtr,1);
+Screen('DrawTexture', windowPtr, ExperimentFinishPage);
+Screen('Flip', windowPtr);
+% leave the ending page on the screen until a key press is received
+pause(1);
+KbWait;
+
+% save all variables into file named fn
+save(fn)
+% short for "Screen('CloseAll')"
+% close all buffers and textures and exit PTB 
+sca
+
+
+
+
+
+
+
