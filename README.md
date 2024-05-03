@@ -7,8 +7,7 @@ Note:
 
 2) the implementation of the "dynamics" is wrong. I implement it as a random generated disparity. However, it should be implemented as a gradually increasing disparity with a certain step. And it should be implemented differently when the step order is odd and even as stated in the paper. You can modify it and see how the real expereiment works.
 
-3) It should work like this:
-<img src="https://github.com/LiaoShiqi97/Reversed-depth-in-RDS-to-reavel-central-peripheral-difference/blob/main/screenshot.png">
+3) It should work like this:<img src="https://github.com/LiaoShiqi97/Reversed-depth-in-RDS-to-reavel-central-peripheral-difference/blob/main/screenshot.png">
 
 4）The paper is Zhaoping L. and Ackermann J. (2018) Reversed Depth in Anticorrelated Random-Dot Stereograms and the Central-Peripheral Difference in Visual Inference Perception, 47(5) 531-539, https://doi.org/10.1177/0301006618758571
 
